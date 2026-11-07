@@ -1,0 +1,321 @@
+# wed-n-ng-c-p
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Quản lý Key Realtime - Firebase</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+
+    <!-- Header -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-500/30">
+                    <i class="fa-solid fa-key text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Cloud Key Management</h1>
+                    <p class="text-xs text-slate-400">Kết nối Firebase Realtime Database</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <span id="connection-status" class="px-3 py-1 text-xs font-medium rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span> Đang kết nối...
+                </span>
+                <button onclick="openCreateModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-medium text-sm transition shadow-lg shadow-blue-600/20 flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Tạo Key Mới
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        
+        <!-- Thống kê nhanh -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-sm">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Tổng số Key</p>
+                        <h3 id="stat-total" class="text-2xl font-bold mt-1 text-white">0</h3>
+                    </div>
+                    <div class="p-3 bg-blue-500/10 text-blue-400 rounded-xl"><i class="fa-solid fa-database text-lg"></i></div>
+                </div>
+            </div>
+            <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-sm">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Đang hoạt động (Active)</p>
+                        <h3 id="stat-active" class="text-2xl font-bold mt-1 text-emerald-400">0</h3>
+                    </div>
+                    <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl"><i class="fa-solid fa-circle-check text-lg"></i></div>
+                </div>
+            </div>
+            <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-sm">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Đã hết hạn / Khóa</p>
+                        <h3 id="stat-expired" class="text-2xl font-bold mt-1 text-rose-400">0</h3>
+                    </div>
+                    <div class="p-3 bg-rose-500/10 text-rose-400 rounded-xl"><i class="fa-solid fa-circle-xmark text-lg"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar tìm kiếm & lọc -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
+            <div class="relative w-full md:w-96">
+                <i class="fa-solid fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                <input type="text" id="search-input" oninput="filterKeys()" placeholder="Tìm kiếm theo mã key hoặc tên khách..." 
+                    class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+            </div>
+            <div class="flex items-center gap-3 w-full md:w-auto">
+                <select id="filter-status" onchange="filterKeys()" class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition w-full md:w-auto">
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="active">Active</option>
+                    <option value="expired">Expired</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Bảng danh sách Key -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider bg-slate-950/50">
+                            <th class="py-4 px-6">Mã Key</th>
+                            <th class="py-4 px-6">Khách hàng / Ghi chú</th>
+                            <th class="py-4 px-6">Trạng thái</th>
+                            <th class="py-4 px-6">Ngày tạo</th>
+                            <th class="py-4 px-6 text-right">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="keys-table-body" class="divide-y divide-slate-800 text-sm">
+                        <!-- Data sẽ được load realtime từ Firebase -->
+                        <tr>
+                            <td colspan="5" class="text-center py-8 text-slate-500">Đang tải dữ liệu từ đám mây...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Tạo / Sửa Key -->
+    <div id="key-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-title" class="text-lg font-bold">Tạo Key Mới</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="key-form" onsubmit="saveKey(event)">
+                <input type="hidden" id="key-id">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Mã Key</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="key-value" required placeholder="Nhập hoặc sinh ngẫu nhiên mã key..." 
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 font-mono">
+                            <button type="button" onclick="generateRandomKey()" class="bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl text-sm transition" title="Sinh ngẫu nhiên">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Tên khách hàng / Ghi chú</label>
+                        <input type="text" id="key-owner" required placeholder="VD: Nguyễn Văn A - Gói Pro" 
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Trạng thái</label>
+                        <select id="key-status" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500">
+                            <option value="active">Active (Hoạt động)</option>
+                            <option value="expired">Expired (Hết hạn)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" onclick="closeModal()" class="bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium transition">Hủy</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition shadow-lg shadow-blue-600/20">Lưu lên Đám mây</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+        import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCQKrsf4BGtI8-PUB1oyp5wz-OpL11MP1A",
+            authDomain: "quanlykey-f0f93.firebaseapp.com",
+            databaseURL: "https://quanlykey-f0f93-default-rtdb.firebaseio.com",
+            projectId: "quanlykey-f0f93",
+            storageBucket: "quanlykey-f0f93.firebasestorage.app",
+            messagingSenderId: "430622101392",
+            appId: "1:430622101392:web:ee42a42716223e5ae12d15",
+            measurementId: "G-3VW5WTXCRV"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const keysRef = ref(db, 'keys');
+
+        let allKeysData = {};
+
+        // Lắng nghe dữ liệu Realtime từ Firebase
+        onValue(keysRef, (snapshot) => {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.className = "px-3 py-1 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5";
+            statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Đã đồng bộ Đám mây`;
+
+            const data = snapshot.val();
+            allKeysData = data || {};
+            renderTable(allKeysData);
+            updateStats(allKeysData);
+        }, (error) => {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.className = "px-3 py-1 text-xs font-medium rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1.5";
+            statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-400"></span> Lỗi kết nối Database`;
+            console.error("Firebase error:", error);
+        });
+
+        window.renderTable = function(data) {
+            const tbody = document.getElementById('keys-table-body');
+            const searchVal = document.getElementById('search-input').value.toLowerCase();
+            const filterVal = document.getElementById('filter-status').value;
+
+            tbody.innerHTML = '';
+            const keys = Object.entries(data);
+
+            if (keys.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">Chưa có key nào trên hệ thống.</td></tr>`;
+                return;
+            }
+
+            let count = 0;
+            keys.reverse().forEach(([id, item]) => {
+                const matchSearch = item.key.toLowerCase().includes(searchVal) || item.owner.toLowerCase().includes(searchVal);
+                const matchFilter = filterVal === 'all' || item.status === filterVal;
+
+                if (!matchSearch || !matchFilter) return;
+                count++;
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/50 transition";
+                tr.innerHTML = `
+                    <td class="py-4 px-6 font-mono font-medium text-blue-400 flex items-center gap-2">
+                        <span>${item.key}</span>
+                        <button onclick="copyKey('${item.key}')" class="text-slate-400 hover:text-white text-xs p-1" title="Sao chép"><i class="fa-regular fa-copy"></i></button>
+                    </td>
+                    <td class="py-4 px-6 text-slate-300">${item.owner}</td>
+                    <td class="py-4 px-6">
+                        <span class="px-2.5 py-1 text-xs font-medium rounded-full ${item.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
+                            ${item.status === 'active' ? 'Active' : 'Expired'}
+                        </span>
+                    </td>
+                    <td class="py-4 px-6 text-slate-400 text-xs">${item.createdAt || 'N/A'}</td>
+                    <td class="py-4 px-6 text-right space-x-2">
+                        <button onclick="editKey('${id}', '${item.key}', '${item.owner}', '${item.status}')" class="text-slate-400 hover:text-blue-400 p-1" title="Sửa"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="deleteKey('${id}')" class="text-slate-400 hover:text-rose-400 p-1" title="Xóa"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if (count === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">Không tìm thấy key phù hợp.</td></tr>`;
+            }
+        }
+
+        window.updateStats = function(data) {
+            const keys = Object.values(data);
+            const total = keys.length;
+            const active = keys.filter(k => k.status === 'active').length;
+            const expired = total - active;
+
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-active').innerText = active;
+            document.getElementById('stat-expired').innerText = expired;
+        }
+
+        window.filterKeys = function() {
+            renderTable(allKeysData);
+        }
+
+        window.openCreateModal = function() {
+            document.getElementById('modal-title').innerText = "Tạo Key Mới";
+            document.getElementById('key-id').value = '';
+            document.getElementById('key-value').value = '';
+            document.getElementById('key-owner').value = '';
+            document.getElementById('key-status').value = 'active';
+            document.getElementById('key-modal').classList.remove('hidden');
+        }
+
+        window.closeModal = function() {
+            document.getElementById('key-modal').classList.add('hidden');
+        }
+
+        window.generateRandomKey = function() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = 'KEY-';
+            for (let i = 0; i < 12; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            document.getElementById('key-value').value = result;
+        }
+
+        window.saveKey = function(event) {
+            event.preventDefault();
+            const id = document.getElementById('key-id').value;
+            const keyValue = document.getElementById('key-value').value;
+            const owner = document.getElementById('key-owner').value;
+            const status = document.getElementById('key-status').value;
+            const createdAt = new Date().toLocaleDateString('vi-VN');
+
+            if (id) {
+                // Update
+                update(ref(db, 'keys/' + id), { key: keyValue, owner, status })
+                    .then(() => closeModal())
+                    .catch(err => alert("Lỗi: " + err.message));
+            } else {
+                // Create new
+                const newRef = push(keysRef);
+                set(newRef, { key: keyValue, owner, status, createdAt })
+                    .then(() => closeModal())
+                    .catch(err => alert("Lỗi: " + err.message));
+            }
+        }
+
+        window.editKey = function(id, keyValue, owner, status) {
+            document.getElementById('modal-title').innerText = "Chỉnh sửa Key";
+            document.getElementById('key-id').value = id;
+            document.getElementById('key-value').value = keyValue;
+            document.getElementById('key-owner').value = owner;
+            document.getElementById('key-status').value = status;
+            document.getElementById('key-modal').classList.remove('hidden');
+        }
+
+        window.deleteKey = function(id) {
+            if (confirm("Bạn có chắc muốn xóa key này khỏi đám mây?")) {
+                remove(ref(db, 'keys/' + id)).catch(err => alert("Lỗi: " + err.message));
+            }
+        }
+
+        window.copyKey = function(text) {
+            navigator.clipboard.writeText(text);
+            alert("Đã sao chép mã key: " + text);
+        }
+    </script>
+</body>
+</html>
